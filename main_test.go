@@ -238,3 +238,69 @@ func TestParseGraphQLObjectWithChildrenWithNoParentCloseCurlyBracket(t *testing.
 		t.Error("Failed: should have children fields 7 but got", lChildrenFields)
 	}
 }
+
+func TestParseGraphQLObjectRepeated(t *testing.T) {
+	// t.SkipNow()
+	uniqueGQLObject = make(map[string]*GraphQLObject)
+	raw := []string{
+		"job_job(",
+		"where: $where",
+		"limit: $limit",
+		"offset: $offset",
+		"order_by: $order_by",
+		") {",
+		"id",
+		"company_id",
+		"input_hash",
+		"class",
+		"is_cacheable",
+		"status",
+		"}",
+	}
+	r, c := parseGraphQLObject(raw)
+	if c > 0 {
+		uniqueGQLObject[r.Name] = r
+	}
+
+	if r.Name != "job_job" {
+		t.Error("Failed: name should be job_job but got", r.Name)
+	}
+
+	if c != 12 {
+		t.Error("Faild: processed count should be 12 but got", c)
+	}
+
+	lFields := len(r.Fields)
+	if lFields != 6 {
+		t.Error("Failed: fields should be 8 but got", lFields)
+	}
+
+	raw = []string{
+		"job_job(",
+		"where: $where",
+		"limit: $limit",
+		"offset: $offset",
+		"order_by: $order_by",
+		") {",
+		"id",
+		"is_cacheable",
+		"input_hash",
+		"output_file_url",
+		"output_expires_at",
+		"}",
+	}
+	r, c = parseGraphQLObject(raw)
+
+	if r.Name != "job_job" {
+		t.Error("Failed: name should be job_job but got", r.Name)
+	}
+
+	if c != 11 {
+		t.Error("Faild: processed count should be 14 but got", c)
+	}
+
+	lFields = len(r.Fields)
+	if lFields != 8 {
+		t.Error("Failed: fields should be 8 but got", lFields)
+	}
+}

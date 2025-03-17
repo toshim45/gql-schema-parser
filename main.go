@@ -163,7 +163,11 @@ func printSchema(schema GraphQLSchema) {
 	}
 }
 
-// parse GraphQLObject from lines
+/**
+* GraphQLObject approach
+**/
+var uniqueGQLObject map[string]*GraphQLObject
+
 type GraphQLObject struct {
 	Name     string
 	Fields   map[string]bool // field-name:is-field-parent
@@ -177,6 +181,7 @@ func (gqlo *GraphQLObject) printObjectList() {
 	}
 }
 
+// parse GraphQLObject from lines
 func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 	lls := len(lines)
 	if lls == 0 {
@@ -195,7 +200,7 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 	line := lines[0]
 
 	for i < lls {
-		// fmt.Println("[debug] processing ", i, "[", lls, "]", line, skipFnParameter)
+		// fmt.Println("[debug] processing ", i, "[", lls, "]", line)
 		if line == ") {" {
 			skipFnParameter = false
 			i++
@@ -217,7 +222,11 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 		isLineAParent := line[ll-1] == '{'
 
 		if match := reNamePattern.FindStringSubmatch(line); len(match) > 1 {
-			o.Name = match[1]
+			if eo, exist := uniqueGQLObject[match[1]]; exist {
+				o = eo
+			} else {
+				o.Name = match[1]
+			}
 			if line[ll-3:ll] != ") {" {
 				skipFnParameter = true
 			}
@@ -241,12 +250,17 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 }
 
 func generateGraphQLObject(queries []string) {
+	uniqueGQLObject = make(map[string]*GraphQLObject)
 	for _, query := range queries {
 		fields := extractFieldsFromQuery(query)
 		o, c := parseGraphQLObject(fields)
 		if c > 0 {
-			o.printObjectList()
+			uniqueGQLObject[o.Name] = o
 		}
+	}
+
+	for _, o := range uniqueGQLObject {
+		o.printObjectList()
 	}
 }
 
