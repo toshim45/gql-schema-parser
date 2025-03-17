@@ -195,7 +195,7 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 	line := lines[0]
 
 	for i < lls {
-		// fmt.Println("[debug] processing ", i, "[", lls, "]", line)
+		// fmt.Println("[debug] processing ", i, "[", lls, "]", line, skipFnParameter)
 		if line == ") {" {
 			skipFnParameter = false
 			i++
@@ -218,12 +218,14 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 
 		if match := reNamePattern.FindStringSubmatch(line); len(match) > 1 {
 			o.Name = match[1]
-			skipFnParameter = true
+			if line[ll-3:ll] != ") {" {
+				skipFnParameter = true
+			}
 		} else {
 			o.Fields[line] = isLineAParent
 		}
 
-		if isLineAParent {
+		if i > 0 && isLineAParent {
 			c, processedCount := parseGraphQLObject(lines[i+1 : lls])
 			i = i + processedCount + 1
 			o.Children = append(o.Children, c)

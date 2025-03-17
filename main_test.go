@@ -37,7 +37,40 @@ func TestParseGraphQLObject(t *testing.T) {
 	if lFields != 8 {
 		t.Error("Failed: fields should be 8 but got", lFields)
 	}
+}
 
+func TestParseGraphQLObjectInLineParamFunction(t *testing.T) {
+	// t.SkipNow()
+	raw := []string{
+		"job: job_job_by_pk(id: $id) {",
+		"id",
+		"company_id",
+		"class",
+		"is_cacheable",
+		"input_hash",
+		"output_file_url",
+		"output_expires_at",
+		"status",
+		"created_at",
+		"created_by",
+		"updated_at",
+		"updated_by",
+		"}",
+	}
+	r, c := parseGraphQLObject(raw)
+
+	if r.Name != "job_job_by_pk" {
+		t.Error("Failed: name should be job_job but got", r.Name)
+	}
+
+	if c != 13 {
+		t.Error("Faild: processed count should be 14 but got", c)
+	}
+
+	lFields := len(r.Fields)
+	if lFields != 12 {
+		t.Error("Failed: fields should be 8 but got", lFields)
+	}
 }
 
 func TestParseGraphQLObjectWithChildrenNormal(t *testing.T) {
