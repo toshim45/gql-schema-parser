@@ -456,7 +456,7 @@ func TestExtractFieldsFromQueryWithFragment(t *testing.T) {
 	}
 }
 
-func TestExtractFieldsFromQueryComplex(t *testing.T) {
+func TestExtractFieldsFromQueryMultilineParentheses(t *testing.T) {
 	// t.SkipNow()
 	q := `
 	  query OutboundConsolidationPickingTask(
