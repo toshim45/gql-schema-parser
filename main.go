@@ -130,7 +130,7 @@ func extractQueryName(query string) string {
 
 // Extract fields from a query (this assumes fields are inside curly braces {})
 func extractFieldsFromQuery(query string) []string {
-	re := regexp.MustCompile(`\{([^}]+)\}`)
+	re := regexp.MustCompile(`\{([\s\S]*)\}`) // \{([\s\S]*)\}$ // \{([^}]+)\}
 	match := re.FindStringSubmatch(query)
 	if len(match) > 1 {
 		lines := strings.Split(match[1], "\n")

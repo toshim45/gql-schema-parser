@@ -345,3 +345,160 @@ func TestParseGraphQLObjectInLineParamCurlyBracketFunction(t *testing.T) {
 		t.Error("Failed: fields should be 18 but got", lFields)
 	}
 }
+
+func TestParseGraphQLObjectMultilineParentheses(t *testing.T) {
+	// t.SkipNow()
+	raw := []string{
+		"outbound_wave_picking_task(",
+		"where: {",
+		"wave_picking_task_inventory_group_list: {",
+		"inventory_group_id: {_eq: $pickingToteId}",
+		"}",
+		"wave_id: {_eq: $waveId}",
+		"}",
+		") {",
+		"id",
+		"wave {",
+		"id",
+		"wave_picking_task_list {",
+		"id",
+		"wave_picking_task_inventory_group_list {",
+		"id",
+		"inventory_group {",
+		"id",
+		"number",
+		"}",
+		"}",
+		"}",
+		"wave_type {",
+		"value",
+		"}",
+		"wave_schedule {",
+		"wave_rule_set {",
+		"name",
+		"}",
+		"}",
+		"}",
+		"}",
+	}
+	r, c := parseGraphQLObject(raw)
+
+	if r.Name != "outbound_wave_picking_task" {
+		t.Error("Failed: name should be outbound_wave_picking_task but got", r.Name)
+	}
+
+	if c != 29 {
+		t.Error("Failed: processed count should be 29 but got", c)
+	}
+
+	lFields := len(r.Fields)
+	if lFields != 2 {
+		t.Log("fields: ", r.Fields)
+		t.Error("Failed: fields should be 2 but got", lFields)
+	}
+}
+
+func TestExtractFieldsFromQuery(t *testing.T) {
+	// t.SkipNow()
+	q := `
+	  query WarehouseZoneList(
+	    $distinct_on: [warehouse_zone_select_column!]
+	    $limit: Int
+	    $offset: Int
+	    $order_by: [warehouse_zone_order_by!]
+	    $where: warehouse_zone_bool_exp
+	  ) {
+	    warehouse_zone(
+	      distinct_on: $distinct_on
+	      limit: $limit
+	      offset: $offset
+	      order_by: $order_by
+	      where: $where
+	    ) {
+	      id
+	      company_id
+	      name
+	    }
+	  }
+	`
+	fields := extractFieldsFromQuery(q)
+	lFields := len(fields)
+	if lFields != 11 {
+		t.Error("Failed: fields should be 11 but got", lFields)
+	}
+}
+
+func TestExtractFieldsFromQueryWithFragment(t *testing.T) {
+	// t.SkipNow()
+	q := `
+	  query WarehouseZoneList(
+	    $distinct_on: [warehouse_zone_select_column!]
+	    $limit: Int
+	    $offset: Int
+	    $order_by: [warehouse_zone_order_by!]
+	    $where: warehouse_zone_bool_exp
+	  ) {
+	    warehouse_zone(
+	      distinct_on: $distinafct_on
+	      limit: $limit
+	      offset: $offset
+	      order_by: $order_by
+	      where: $where
+	    ) {
+	      ...WarehouseZoneListItem
+	    }
+	  }
+	`
+	fields := extractFieldsFromQuery(q)
+	lFields := len(fields)
+	if lFields != 9 {
+		t.Error("Failed: fields should be 9 but got", lFields)
+	}
+}
+
+func TestExtractFieldsFromQueryComplex(t *testing.T) {
+	// t.SkipNow()
+	q := `
+	  query OutboundConsolidationPickingTask(
+	    $pickingToteId: uuid!
+	    $waveId: uuid!
+	  ) {
+	    outbound_wave_picking_task(
+	      where: {
+	        wave_picking_task_inventory_group_list: {
+	          inventory_group_id: {_eq: $pickingToteId}
+	        }
+	        wave_id: {_eq: $waveId}
+	      }
+	    ) {
+	      id
+	      wave {
+	        id
+	        wave_picking_task_list {
+	          id
+	          wave_picking_task_inventory_group_list {
+	            id
+	            inventory_group {
+	              id
+	              number
+	            }
+	          }
+	        }
+	        wave_type {
+	          value
+	        }
+	        wave_schedule {
+	          wave_rule_set {
+	            name
+	          }
+	        }
+	      }
+	    }
+	  }
+	`
+	fields := extractFieldsFromQuery(q)
+	lFields := len(fields)
+	if lFields != 31 {
+		t.Error("Failed: fields should be 31 but got", lFields)
+	}
+}
