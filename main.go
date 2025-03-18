@@ -59,13 +59,13 @@ func run(path string, isParse, isGenerate bool) {
 
 	if isParse {
 		generateGraphQLObject(queries)
-	}
-
-	if isGenerate {
-		// schema := generateGraphQLSchema(queries)
-		// // Print the generated GraphQL schema
-		// fmt.Println("Generated GraphQL Schema:")
-		// printSchema(schema)
+	} else if isGenerate {
+		schema := generateGraphQLSchema(queries)
+		// Print the generated GraphQL schema
+		fmt.Println("Generated GraphQL Schema:")
+		printSchema(schema)
+	} else {
+		fmt.Println("help: gqlsch -h")
 	}
 }
 
