@@ -32,7 +32,7 @@ type GraphQLQuery struct {
 	Fields []string
 }
 
-func run(path string) {
+func run(path string, isParse, isGenerate bool) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
@@ -57,12 +57,16 @@ func run(path string) {
 
 	}
 
-	generateGraphQLObject(queries)
+	if isParse {
+		generateGraphQLObject(queries)
+	}
 
-	// schema := generateGraphQLSchema(queries)
-	// // Print the generated GraphQL schema
-	// fmt.Println("Generated GraphQL Schema:")
-	// printSchema(schema)
+	if isGenerate {
+		// schema := generateGraphQLSchema(queries)
+		// // Print the generated GraphQL schema
+		// fmt.Println("Generated GraphQL Schema:")
+		// printSchema(schema)
+	}
 }
 
 // Extract GraphQL queries from TypeScript files
@@ -265,6 +269,8 @@ func generateGraphQLObject(queries []string) {
 }
 
 var opts struct {
+	Parse      bool `short:"p" long:"parse" description:"Function to parse graphql from file(s)"`
+	Generate   bool `short:"g" long:"generate" description:"Function to generate graphql from file(s)"`
 	Positional struct {
 		Pathname string
 	} `positional-args:"true" required:"true"`
@@ -285,5 +291,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	run(opts.Positional.Pathname)
+	run(opts.Positional.Pathname, opts.Parse, opts.Generate)
 }
