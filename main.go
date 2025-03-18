@@ -199,12 +199,13 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 	reNamePattern := regexp.MustCompile(namePattern)
 
 	skipFnParameter := false
+	isLineAParent := false
 
 	i := 0
 	line := lines[0]
 
 	for i < lls {
-		// fmt.Println("[debug] processing ", i, "[", lls, "]", line)
+		// fmt.Println("[debug] processing ", i, "[", lls, "]", line, skipFnParameter, isLineAParent)
 		if line == ") {" {
 			skipFnParameter = false
 			i++
@@ -223,7 +224,7 @@ func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
 		}
 
 		ll := len(line)
-		isLineAParent := line[ll-1] == '{'
+		isLineAParent = line[ll-1] == '{'
 
 		if match := reNamePattern.FindStringSubmatch(line); len(match) > 1 {
 			if eo, exist := uniqueGQLObject[match[1]]; exist {

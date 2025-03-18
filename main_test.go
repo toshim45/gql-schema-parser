@@ -39,40 +39,6 @@ func TestParseGraphQLObject(t *testing.T) {
 	}
 }
 
-func TestParseGraphQLObjectInLineParamFunction(t *testing.T) {
-	// t.SkipNow()
-	raw := []string{
-		"job: job_job_by_pk(id: $id) {",
-		"id",
-		"company_id",
-		"class",
-		"is_cacheable",
-		"input_hash",
-		"output_file_url",
-		"output_expires_at",
-		"status",
-		"created_at",
-		"created_by",
-		"updated_at",
-		"updated_by",
-		"}",
-	}
-	r, c := parseGraphQLObject(raw)
-
-	if r.Name != "job_job_by_pk" {
-		t.Error("Failed: name should be job_job but got", r.Name)
-	}
-
-	if c != 13 {
-		t.Error("Faild: processed count should be 14 but got", c)
-	}
-
-	lFields := len(r.Fields)
-	if lFields != 12 {
-		t.Error("Failed: fields should be 8 but got", lFields)
-	}
-}
-
 func TestParseGraphQLObjectWithChildrenNormal(t *testing.T) {
 	// t.SkipNow()
 	raw := []string{
@@ -302,5 +268,80 @@ func TestParseGraphQLObjectRepeated(t *testing.T) {
 	lFields = len(r.Fields)
 	if lFields != 8 {
 		t.Error("Failed: fields should be 8 but got", lFields)
+	}
+}
+
+func TestParseGraphQLObjectInLineParamFunction(t *testing.T) {
+	// t.SkipNow()
+	raw := []string{
+		"job: job_job_by_pk(id: $id) {",
+		"id",
+		"company_id",
+		"class",
+		"is_cacheable",
+		"input_hash",
+		"output_file_url",
+		"output_expires_at",
+		"status",
+		"created_at",
+		"created_by",
+		"updated_at",
+		"updated_by",
+		"}",
+	}
+	r, c := parseGraphQLObject(raw)
+
+	if r.Name != "job_job_by_pk" {
+		t.Error("Failed: name should be job_job_by_pk but got", r.Name)
+	}
+
+	if c != 13 {
+		t.Error("Faild: processed count should be 14 but got", c)
+	}
+
+	lFields := len(r.Fields)
+	if lFields != 12 {
+		t.Error("Failed: fields should be 8 but got", lFields)
+	}
+}
+
+func TestParseGraphQLObjectInLineParamCurlyBracketFunction(t *testing.T) {
+	// t.SkipNow()
+	raw := []string{
+		"warehouses: warehouse_warehouse(where: $where, order_by: [{name: asc}]) {",
+		"id",
+		"company_id",
+		"name",
+		"number",
+		"email",
+		"phone_number",
+		"status",
+		"address_city",
+		"address_district",
+		"address_province",
+		"address_region_code",
+		"address_street",
+		"address_sub_district",
+		"address_zip_code",
+		"created_at",
+		"created_by",
+		"updated_at",
+		"updated_by",
+		"}",
+		"}",
+	}
+	r, c := parseGraphQLObject(raw)
+
+	if r.Name != "warehouse_warehouse" {
+		t.Error("Failed: name should be warehouse_warehouse but got", r.Name)
+	}
+
+	if c != 19 {
+		t.Error("Faild: processed count should be 19 but got", c)
+	}
+
+	lFields := len(r.Fields)
+	if lFields != 18 {
+		t.Error("Failed: fields should be 18 but got", lFields)
 	}
 }
