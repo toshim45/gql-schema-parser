@@ -2,279 +2,19 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/jessevdk/go-flags"
+	"github.com/vektah/gqlparser/v2"
+	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/parser"
 )
 
-type GraphQLSchema struct {
-	Types   map[string]GraphQLType
-	Queries map[string]GraphQLQuery
-}
-
-type GraphQLType struct {
-	Fields map[string]GraphQLField
-}
-
-type GraphQLField struct {
-	Type        string
-	IsEnum      bool
-	IsRequired  bool
-	Description string
-}
-
-type GraphQLQuery struct {
-	Name   string
-	Fields []string
-}
-
-func run(path string, isParse, isGenerate bool) {
-	files, err := os.ReadDir(path)
-	if err != nil {
-		fmt.Println("Error reading directory:", err)
-	}
-
-	var queries []string
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		// Read TypeScript file(s)
-		fileFullpath := filepath.Join(path, file.Name())
-		fileContent, err := ioutil.ReadFile(fileFullpath)
-		if err != nil {
-			fmt.Println("Error reading file:", err)
-			return
-		}
-
-		// Extract GraphQL queries from the TypeScript file
-		qs := extractGraphQLQueries(string(fileContent))
-		queries = append(queries, qs...)
-
-	}
-
-	if isParse {
-		generateGraphQLObject(queries)
-	} else if isGenerate {
-		schema := generateGraphQLSchema(queries)
-		// Print the generated GraphQL schema
-		fmt.Println("Generated GraphQL Schema:")
-		printSchema(schema)
-	} else {
-		fmt.Println("help: gqlsch -h")
-	}
-}
-
-// Extract GraphQL queries from TypeScript files
-func extractGraphQLQueries(tsContent string) []string {
-	// Simple regex to find GraphQL queries inside gql``
-	// Assumes all GraphQL queries are wrapped in gql`...`
-	re := regexp.MustCompile(`gql\s*` + "`([^`]+)`")
-	matches := re.FindAllStringSubmatch(tsContent, -1)
-
-	var queries []string
-	for _, match := range matches {
-		queries = append(queries, match[1])
-	}
-	return queries
-}
-
-// Generate GraphQL schema based on the extracted queries
-func generateGraphQLSchema(queries []string) GraphQLSchema {
-	schema := GraphQLSchema{
-		Types:   make(map[string]GraphQLType), // this one need to be initiated somewhere
-		Queries: make(map[string]GraphQLQuery),
-	}
-
-	for _, query := range queries {
-		// For simplicity, this basic example only extracts type names and fields
-		queryName := extractQueryName(query)
-		fields := extractFieldsFromQuery(query)
-
-		schema.Queries[queryName] = GraphQLQuery{
-			Name:   queryName,
-			Fields: fields,
-		}
-
-		// Generate types for each field (very basic implementation)
-		for _, field := range fields {
-			// Create types for fields if not already defined
-			if _, exists := schema.Types[field]; !exists {
-				schema.Types[field] = GraphQLType{
-					Fields: map[string]GraphQLField{
-						"dummyField": {
-							Type: "String",
-						},
-					},
-				}
-			}
-		}
-	}
-
-	return schema
-}
-
-// Extract query name (this assumes the query name is the first word after 'query' keyword)
-func extractQueryName(query string) string {
-	re := regexp.MustCompile(`query\s+([A-Za-z0-9_]+)`)
-	match := re.FindStringSubmatch(query)
-	if len(match) > 1 {
-		return match[1]
-	}
-	return ""
-}
-
-// Extract fields from a query (this assumes fields are inside curly braces {})
-func extractFieldsFromQuery(query string) []string {
-	re := regexp.MustCompile(`\{([\s\S]*)\}`) // \{([\s\S]*)\}$ // \{([^}]+)\}
-	match := re.FindStringSubmatch(query)
-	if len(match) > 1 {
-		lines := strings.Split(match[1], "\n")
-		var result []string
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			result = append(result, line)
-		}
-		return result
-	}
-	return nil
-}
-
-// Print the GraphQL schema
-func printSchema(schema GraphQLSchema) {
-	for queryName, query := range schema.Queries {
-		fmt.Printf("query %s {\n", queryName)
-		for _, field := range query.Fields {
-			fmt.Printf("  %s\n", field)
-		}
-		fmt.Println("}")
-	}
-
-	// Print Types
-	for typeName, gqlType := range schema.Types {
-		fmt.Printf("type %s {\n", typeName)
-		for fieldName, field := range gqlType.Fields {
-			fmt.Printf("  %s: %s\n", fieldName, field.Type)
-		}
-		fmt.Println("}")
-	}
-}
-
-/**
-* GraphQLObject approach
-**/
-var uniqueGQLObject map[string]*GraphQLObject
-
-type GraphQLObject struct {
-	Name     string
-	Fields   map[string]bool // field-name:is-field-parent
-	Children []*GraphQLObject
-}
-
-func (gqlo *GraphQLObject) printObjectList() {
-	fmt.Println("[", gqlo.Name, "]")
-	for n := range gqlo.Fields {
-		fmt.Println(n)
-	}
-}
-
-// parse GraphQLObject from lines
-func parseGraphQLObject(lines []string) (*GraphQLObject, int) {
-	lls := len(lines)
-	if lls == 0 {
-		return nil, 0
-	}
-
-	o := &GraphQLObject{}
-	o.Fields = make(map[string]bool)
-
-	namePattern := `(\w+)\(`
-	reNamePattern := regexp.MustCompile(namePattern)
-
-	skipFnParameter := false
-	isLineAParent := false
-
-	i := 0
-	line := lines[0]
-
-	for i < lls {
-		// fmt.Println("[debug] processing ", i, "[", lls, "]", line, skipFnParameter, isLineAParent)
-		if line == ") {" {
-			skipFnParameter = false
-			i++
-			line = lines[i]
-			continue
-		}
-
-		if skipFnParameter {
-			i++
-			line = lines[i]
-			continue
-		}
-
-		if line == "}" {
-			break
-		}
-
-		ll := len(line)
-		isLineAParent = line[ll-1] == '{'
-
-		if match := reNamePattern.FindStringSubmatch(line); len(match) > 1 {
-			if eo, exist := uniqueGQLObject[match[1]]; exist {
-				o = eo
-			} else {
-				o.Name = match[1]
-			}
-			if line[ll-3:ll] != ") {" {
-				skipFnParameter = true
-			}
-		} else {
-			o.Fields[line] = isLineAParent
-		}
-
-		if i > 0 && isLineAParent {
-			c, processedCount := parseGraphQLObject(lines[i+1 : lls])
-			i = i + processedCount + 1
-			o.Children = append(o.Children, c)
-		}
-
-		i++
-		if i < lls {
-			line = lines[i]
-		}
-	}
-
-	return o, i
-}
-
-func generateGraphQLObject(queries []string) {
-	uniqueGQLObject = make(map[string]*GraphQLObject)
-	for _, query := range queries {
-		fields := extractFieldsFromQuery(query)
-		o, c := parseGraphQLObject(fields)
-		if c > 0 {
-			uniqueGQLObject[o.Name] = o
-		}
-	}
-
-	for _, o := range uniqueGQLObject {
-		o.printObjectList()
-	}
-}
-
 var opts struct {
-	Parse      bool `short:"p" long:"parse" description:"Function to parse graphql from file(s)"`
-	Generate   bool `short:"g" long:"generate" description:"Function to generate graphql from file(s)"`
-	Positional struct {
-		Pathname string
-	} `positional-args:"true" required:"true"`
+	SourceFile string `long:"source" description:"Input source file"`
+	SchemaFile string `long:"schema" description:"Input raw schema file"`
 }
 
 func main() {
@@ -292,5 +32,133 @@ func main() {
 		os.Exit(1)
 	}
 
-	run(opts.Positional.Pathname, opts.Parse, opts.Generate)
+	fmt.Println("schema file: ", opts.SchemaFile)
+	fmt.Println("source file: ", opts.SourceFile)
+
+	// schemaFilePath := "/home/artikow/Documents/Sources/gtl-wms-graphql/hasura-20250225.graphqls"
+	// gqlQueryFilePath := "/home/artikow/Documents/Sources/gql-schema-parser/raw/InboundV3Test.ts"
+	gqlQuery := extractGQLFromFile(opts.SourceFile)
+
+	run(opts.SchemaFile, gqlQuery)
+}
+
+func extractGQLFromFile(filePath string) (output string) {
+	// Read the file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Println("Error reading file", filePath, ":", err)
+		os.Exit(1)
+	}
+
+	// Convert the content to a string
+	fileContent := string(content)
+
+	// Define the regular expression pattern to find GraphQL queries
+	// This pattern looks for 'gql`' or 'graphql`' followed by any characters until a closing backtick.
+	// It also captures the content between the backticks.
+	re := regexp.MustCompile(`(?s)(?:gql|graphql)` + "`" + `(.*?)` + "`")
+
+	// Find all matches in the file content
+	matches := re.FindAllStringSubmatch(fileContent, -1)
+
+	// Iterate through the matches and print the extracted queries
+	if len(matches) > 0 {
+		output = matches[0][1]
+	} else {
+		fmt.Println("No GraphQL queries found in the file.")
+	}
+	return
+}
+
+func run(schemaFilePath, gqlQuery string) {
+	// Load schema
+	schemaData, err := os.ReadFile(schemaFilePath)
+	if err != nil {
+		panic(err)
+	}
+	schema, err := gqlparser.LoadSchema(&ast.Source{Input: string(schemaData), Name: "schema.graphql"})
+	if err != nil {
+		panic(err)
+	}
+
+	// Load query
+
+	queryDoc, err := parser.ParseQuery(&ast.Source{Input: gqlQuery, Name: "query.graphql"})
+	if err != nil {
+		panic(err)
+	}
+
+	visited := map[string]map[string]bool{}
+	var output []string
+
+	for _, op := range queryDoc.Operations {
+		for _, sel := range op.SelectionSet {
+			if field, ok := sel.(*ast.Field); ok {
+				processField(field, schema.Query, schema, visited, &output)
+			}
+		}
+	}
+
+	for _, def := range output {
+		fmt.Println(def)
+		fmt.Println()
+	}
+}
+
+// Recursive field processor
+func processField(field *ast.Field, parentType *ast.Definition, schema *ast.Schema, visited map[string]map[string]bool, output *[]string) {
+	fieldDef := schema.Types[parentType.Name].Fields.ForName(field.Name)
+	if fieldDef == nil {
+		return
+	}
+
+	fieldType := unwrapType(fieldDef.Type)
+	typeDef := schema.Types[fieldType]
+
+	if typeDef == nil || typeDef.BuiltIn {
+		return
+	}
+
+	if visited[typeDef.Name] == nil {
+		visited[typeDef.Name] = map[string]bool{}
+	}
+	for _, sel := range field.SelectionSet {
+		if f, ok := sel.(*ast.Field); ok {
+			visited[typeDef.Name][f.Name] = true
+			processField(f, typeDef, schema, visited, output)
+		}
+	}
+
+	// If not yet printed, add the trimmed type
+	if !typeAlreadyAdded(typeDef.Name, *output) {
+		*output = append(*output, buildPartialType(typeDef, visited[typeDef.Name]))
+	}
+}
+
+func unwrapType(t *ast.Type) string {
+	for t.Elem != nil {
+		t = t.Elem
+	}
+	return t.NamedType
+}
+
+func buildPartialType(def *ast.Definition, fields map[string]bool) string {
+	var sb strings.Builder
+	sb.WriteString("type " + def.Name + " {\n")
+	for _, f := range def.Fields {
+		if fields[f.Name] {
+			sb.WriteString("  " + f.Name + ": " + f.Type.String() + "\n")
+		}
+	}
+	sb.WriteString("}")
+	return sb.String()
+}
+
+func typeAlreadyAdded(name string, output []string) bool {
+	for _, o := range output {
+		if strings.HasPrefix(o, "type "+name+" ") {
+			return true
+		}
+	}
+	return false
 }

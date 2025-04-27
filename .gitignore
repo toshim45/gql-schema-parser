@@ -3,6 +3,7 @@
 #
 # Binaries for programs and plugins
 binary
+gqlsch
 *.exe
 *.exe~
 *.dll
