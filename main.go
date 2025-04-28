@@ -35,8 +35,6 @@ func main() {
 	fmt.Println("schema file: ", opts.SchemaFile)
 	fmt.Println("source file: ", opts.SourceFile)
 
-	// schemaFilePath := "/home/artikow/Documents/Sources/gtl-wms-graphql/hasura-20250225.graphqls"
-	// gqlQueryFilePath := "/home/artikow/Documents/Sources/gql-schema-parser/raw/InboundV3Test.ts"
 	gqlQuery := extractGQLFromFile(opts.SourceFile)
 
 	if gqlQuery == "" {
@@ -133,17 +131,55 @@ func processField(field *ast.Field, parentType *ast.Definition, schema *ast.Sche
 	if visited[typeDef.Name] == nil {
 		visited[typeDef.Name] = map[string]bool{}
 	}
+
+	fieldHasArgs := map[string]bool{}
 	for _, sel := range field.SelectionSet {
 		if f, ok := sel.(*ast.Field); ok {
 			visited[typeDef.Name][f.Name] = true
+			if len(f.Arguments) > 0 {
+				fieldHasArgs[f.Name] = true
+			}
 			processField(f, typeDef, schema, visited, output)
 		}
 	}
+
+	processArgumentList(fieldHasArgs, typeDef, schema, output)
 
 	// If not yet printed, add the trimmed type
 	if !typeAlreadyAdded(typeDef.Name, *output) {
 		*output = append(*output, buildPartialType(typeDef, visited[typeDef.Name]))
 	}
+}
+
+func processArgumentList(fieldHasArgs map[string]bool, def *ast.Definition, schema *ast.Schema, output *[]string) {
+	for _, f := range def.Fields {
+		if _, exist := fieldHasArgs[f.Name]; exist && len(f.Arguments) > 0 {
+			for _, a := range f.Arguments {
+				t := unwrapType(a.Type)
+				d := schema.Types[t]
+				if d == nil || d.BuiltIn {
+					continue
+				}
+				if !typeAlreadyAdded(d.Name, *output) {
+					*output = append(*output, processArgument(d))
+				}
+			}
+		}
+	}
+}
+
+func processArgument(def *ast.Definition) string {
+	var sb strings.Builder
+	sb.WriteString("input " + def.Name + " {\n")
+	if strings.HasSuffix(def.Name, "order_by") {
+		sb.WriteString("  id : order_by\n")
+	} else if strings.HasSuffix(def.Name, "bool_exp") {
+		sb.WriteString("  _and: [" + def.Name + "!]\n")
+		sb.WriteString("  _not: " + def.Name + "\n")
+		sb.WriteString("  _or: [" + def.Name + "!]\n")
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 func unwrapType(t *ast.Type) string {
@@ -158,7 +194,16 @@ func buildPartialType(def *ast.Definition, fields map[string]bool) string {
 	sb.WriteString("type " + def.Name + " {\n")
 	for _, f := range def.Fields {
 		if fields[f.Name] {
-			sb.WriteString("  " + f.Name + ": " + f.Type.String() + "\n")
+			argStr := ""
+			if len(f.Arguments) > 0 {
+				var argStrList []string
+				for _, arg := range f.Arguments {
+					argStrList = append(argStrList, arg.Name+":"+arg.Type.Name())
+				}
+
+				argStr = "(" + strings.Join(argStrList, ",") + ")"
+			}
+			sb.WriteString("  " + f.Name + argStr + ": " + f.Type.String() + "\n")
 		}
 	}
 	sb.WriteString("}")

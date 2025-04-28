@@ -26,3 +26,4 @@ gqlsch --schema big-raw-gql-schema.graphql --source <file containing graphql, ca
 - [ ] test parse mutation
 - [ ] source directory or files
 - [ ] merge multiple graphql query
+- [ ] compare the diff from target graphql if any
