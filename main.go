@@ -95,6 +95,14 @@ func run(schemaFilePath, gqlQuery string) {
 	var output []string
 
 	for _, op := range queryDoc.Operations {
+		for _, vd := range op.VariableDefinitions {
+			d := schema.Types[vd.Type.NamedType]
+			if d == nil || d.BuiltIn {
+				continue
+			}
+
+			output = append(output, processArgument(d))
+		}
 		for _, sel := range op.SelectionSet {
 			if field, ok := sel.(*ast.Field); ok {
 				if op.Operation == "query" {
