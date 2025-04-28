@@ -1,8 +1,7 @@
 # Walkthrough
 ```
-gqlsch -p <directory containing graphql, can be .ts .js>
+gqlsch --schema big-raw-gql-schema.graphql --source <file containing graphql, can be .ts .js>
 ```
-
 
 ## Manual Proses
 
@@ -20,3 +19,10 @@ gqlsch -p <directory containing graphql, can be .ts .js>
 6. make build
 7. push the to wms-graph repo origin
 8. if there are some field not exist on the resolver implementation go back to step 4
+
+## Feature Goals
+- [x] take graphql query from ts
+- [x] integrate cli to those
+- [ ] test parse mutation
+- [ ] source directory or files
+- [ ] merge multiple graphql query
