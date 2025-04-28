@@ -104,7 +104,7 @@ func run(schemaFilePath, gqlQuery string) {
 				} else if op.Operation == "mutation" {
 					processField(field, schema.Mutation, schema, visited, &output)
 				} else {
-					panic("gql operation type is not supported")
+					panic("gql operation type is not supported: " + op.Operation)
 				}
 			}
 		}
