@@ -39,6 +39,11 @@ func main() {
 	// gqlQueryFilePath := "/home/artikow/Documents/Sources/gql-schema-parser/raw/InboundV3Test.ts"
 	gqlQuery := extractGQLFromFile(opts.SourceFile)
 
+	if gqlQuery == "" {
+		fmt.Fprintln(os.Stderr, "Error: no graphql query/mutation extracted")
+		os.Exit(1)
+	}
+
 	run(opts.SchemaFile, gqlQuery)
 }
 
@@ -94,7 +99,13 @@ func run(schemaFilePath, gqlQuery string) {
 	for _, op := range queryDoc.Operations {
 		for _, sel := range op.SelectionSet {
 			if field, ok := sel.(*ast.Field); ok {
-				processField(field, schema.Query, schema, visited, &output)
+				if op.Operation == "query" {
+					processField(field, schema.Query, schema, visited, &output)
+				} else if op.Operation == "mutation" {
+					processField(field, schema.Mutation, schema, visited, &output)
+				} else {
+					panic("gql operation type is not supported")
+				}
 			}
 		}
 	}
