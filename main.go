@@ -42,6 +42,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Printf("\n-----\n")
+
 	run(opts.SchemaFile, gqlQuery)
 }
 
@@ -178,10 +180,15 @@ func processArgumentList(fieldHasArgs map[string]bool, def *ast.Definition, sche
 
 func processArgument(def *ast.Definition) string {
 	var sb strings.Builder
-	sb.WriteString("input " + def.Name + " {\n")
-	if strings.HasSuffix(def.Name, "order_by") {
+
+	if strings.HasSuffix(def.Name, "select_column") {
+		sb.WriteString("enum " + def.Name + " {\n")
+		sb.WriteString("  id\n")
+	} else if strings.HasSuffix(def.Name, "order_by") {
+		sb.WriteString("input " + def.Name + " {\n")
 		sb.WriteString("  id : order_by\n")
 	} else if strings.HasSuffix(def.Name, "bool_exp") {
+		sb.WriteString("input " + def.Name + " {\n")
 		sb.WriteString("  _and: [" + def.Name + "!]\n")
 		sb.WriteString("  _not: " + def.Name + "\n")
 		sb.WriteString("  _or: [" + def.Name + "!]\n")
@@ -199,6 +206,9 @@ func unwrapType(t *ast.Type) string {
 
 func buildPartialType(def *ast.Definition, fields map[string]bool) string {
 	var sb strings.Builder
+	if def.Name == "uuid" || def.Name == "json" {
+		return "scalar " + def.Name
+	}
 	sb.WriteString("type " + def.Name + " {\n")
 	for _, f := range def.Fields {
 		if fields[f.Name] {
