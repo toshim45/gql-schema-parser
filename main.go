@@ -12,10 +12,14 @@ import (
 	"github.com/vektah/gqlparser/v2/parser"
 )
 
-var opts struct {
-	SourceFile string `long:"source" description:"Input source file"`
-	SchemaFile string `long:"schema" description:"Input raw schema file"`
-}
+var (
+	opts struct {
+		SourceFile string `long:"source" description:"Input source file"`
+		SchemaFile string `long:"schema" description:"Input raw schema file"`
+	}
+
+	scalarUnq map[string]bool = map[string]bool{}
+)
 
 func main() {
 	_, err := flags.Parse(&opts)
@@ -206,7 +210,12 @@ func unwrapType(t *ast.Type) string {
 
 func buildPartialType(def *ast.Definition, fields map[string]bool) string {
 	var sb strings.Builder
-	if def.Name == "uuid" || def.Name == "json" {
+	if def.Name == "uuid" || def.Name == "json" || def.Name == "timestamptz" {
+		if _, exist := scalarUnq[def.Name]; exist {
+			return ""
+		}
+
+		scalarUnq[def.Name] = true
 		return "scalar " + def.Name
 	}
 	sb.WriteString("type " + def.Name + " {\n")
