@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -244,4 +246,347 @@ func typeAlreadyAdded(name string, output []string) bool {
 		}
 	}
 	return false
+}
+
+type ImportResult struct {
+	Name     string
+	FromPath string
+}
+
+func GetImportFromDir(directoryPath string) []ImportResult {
+	var results []ImportResult
+	unq := map[string]bool{}
+
+	// Regular expression to match import statements with destructuring
+	importRegex := regexp.MustCompile(`import\s*{([^}]+)}\s*from\s*['"](@wms/hooks/[^'"]+)['"]`)
+	// Regex for single import statements
+	singleImportRegex := regexp.MustCompile(`import\s+{?\s*(\w+)\s*}?\s*from\s*['"](@wms/hooks/[^'"]+)['"]`)
+
+	err := filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		paths := strings.Split(path, "/pages/")
+		if len(paths) < 2 {
+			// fmt.Println("[DEBUG] invalid path", path)
+			return nil
+		}
+		lastIdxOfSlash := strings.LastIndex(paths[1], "/")
+
+		var pagePath string
+		if lastIdxOfSlash != -1 {
+			pagePath = paths[1][:lastIdxOfSlash]
+		}
+		if _, exist := eligiblePage[pagePath]; !exist {
+			// fmt.Println("[DEBUG] invalid page", paths[1])
+			return nil
+		}
+
+		// Skip if not a TypeScript/JavaScript file
+		if !strings.HasSuffix(path, ".ts") && !strings.HasSuffix(path, ".tsx") {
+			return nil
+		}
+
+		// Read file content
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		fileContent := string(content)
+
+		// Find all destructured imports
+		matches := importRegex.FindAllStringSubmatch(fileContent, -1)
+		for _, match := range matches {
+			if len(match) >= 3 {
+				imports := strings.Split(match[1], ",")
+				fromPath := strings.TrimPrefix(match[2], "@")
+
+				for _, imp := range imports {
+					// Clean up the import name
+					name := strings.TrimSpace(imp)
+					name = strings.Trim(name, "{}")
+					if name == "" {
+						continue
+					}
+
+					if _, exist := unq[name]; !exist {
+						unq[name] = true
+						results = append(results, ImportResult{
+							Name:     name,
+							FromPath: fromPath,
+						})
+					}
+				}
+			}
+		}
+
+		// Find all single imports
+		singleMatches := singleImportRegex.FindAllStringSubmatch(fileContent, -1)
+		for _, match := range singleMatches {
+			if len(match) >= 3 {
+				name := strings.TrimSpace(match[1])
+				fromPath := strings.TrimPrefix(match[2], "@")
+
+				if _, exist := unq[name]; !exist {
+					unq[name] = true
+					results = append(results, ImportResult{
+						Name:     name,
+						FromPath: fromPath,
+					})
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return results
+}
+
+func GetEligiblePage(directoryPath string) map[string]bool {
+	unqEligiblePage := map[string]bool{}
+	// Regex for eligigle route
+	routeRegex := regexp.MustCompile(`path:\s*['"](/[a-zA-Z-]+(?:/[a-zA-Z-]+)*)['"]`)
+
+	var eligibleRoute map[string]bool = map[string]bool{
+		"/inbound-v3/schedule":                    true,
+		"/inbound-v3/unload":                      true,
+		"/inbound-v3/backlog-monitoring":          true,
+		"/inbound-v3/inventory-group-monitoring":  true,
+		"/inbound/schedule":                       true,
+		"/inventory/move-stock":                   true,
+		"/inventory/move-return-stock":            true,
+		"/inventory/move-totes-stock":             true,
+		"/inventory/move-available-stock":         true,
+		"/inventory/move-allocated-stock":         true,
+		"/inventory/move-group":                   true,
+		"/inventory/admin":                        true,
+		"/inventory/adjustment-log":               true,
+		"/inventory-group/admin":                  true,
+		"/inventory/counting":                     true,
+		"/inventory/warehouse-transfer":           true,
+		"/inventory/task-management":              true,
+		"/product":                                true,
+		"/replenishment":                          true,
+		"/replenishment/operator":                 true,
+		"/outbound/admin":                         true,
+		"/outbound/wave-config/schedule":          true,
+		"/outbound/wave":                          true,
+		"/outbound/wave-picking-task":             true,
+		"/outbound/wave-picking-task/queue":       true,
+		"/outbound/wave-consolidation-task":       true,
+		"/outbound/checkpack":                     true,
+		"/outbound/station-management":            true,
+		"/outbound/station/dashboard":             true,
+		"/outbound/class-management":              true,
+		"/outbound/packaging-simulator":           true,
+		"/outbound/packaging-visualizer":          true,
+		"/outbound/packer":                        true,
+		"/outbound/packing-task":                  true,
+		"/outbound/peso/detail":                   true,
+		"/shipment/receiving":                     true,
+		"/shipment/labeling":                      true,
+		"/shipment/grouping":                      true,
+		"/shipment/loading":                       true,
+		"/shipment/routing-manifest":              true,
+		"/shipment/manifest-v2":                   true,
+		"/shipment/manifest-destroy":              true,
+		"/shipment/handover":                      true,
+		"/shipment/waybill":                       true,
+		"/shipment/waypoint":                      true,
+		"/shipment/courier":                       true,
+		"/shipment/databank":                      true,
+		"/shipment/databank/group":                true,
+		"/integration/virtual-bundling-v2":        true,
+		"/integration/wsn-admin":                  true,
+		"/integration/gifting":                    true,
+		"/tenant":                                 true,
+		"/tenant/group":                           true,
+		"/job":                                    true,
+		"/admin/location":                         true,
+		"/admin/user":                             true,
+		"/intools/packaging-config":               true,
+		"/intools/packaging-recommender/rule-set": true,
+		"/intools/remote-config":                  true,
+		"/intools/warehouse/zone":                 true,
+		"/intools/outbound/schedule":              true,
+		"/tell-me-why":                            true,
+	}
+
+	err := filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip if not a TypeScript/JavaScript file
+		if !strings.HasSuffix(path, "index.ts") {
+			return nil
+		}
+
+		// Read file content
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		fileContent := string(content)
+
+		// whitelist route
+		routeMatches := routeRegex.FindAllStringSubmatch(fileContent, 1)
+		for _, match := range routeMatches {
+			if len(match) == 2 {
+				if _, exist := eligibleRoute[match[1]]; !exist {
+					fmt.Println("[DEBUG] invalid route", path, match[1])
+					return nil
+				}
+			}
+		}
+
+		unqEligiblePage[path[:len(path)-9]] = true
+
+		return nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return unqEligiblePage
+}
+
+var eligiblePage map[string]bool = map[string]bool{
+	"InventoryMoveStock/V2/utils":                true,
+	"OutboundWavePickingTask":                    true,
+	"ShipmentWaybill":                            true,
+	"IntegrationGifting":                         true,
+	"IntegrationWsnAdmin":                        true,
+	"OutboundPackagingSimulator":                 true,
+	"PackagingRecommenderPackagingConfig":        true,
+	"InboundV3BacklogMonitoring":                 true,
+	"OutboundWaveConsolidationTask":              true,
+	"ShipmentDatabank":                           true,
+	"ShipmentLoading":                            true,
+	"InboundV3Unload":                            true,
+	"OutboundClassManagement":                    true,
+	"InventoryProduct":                           true,
+	"ShipmentWaypoint":                           true,
+	"InboundV3InventoryGroupMonitoring":          true,
+	"OutboundAdmin":                              true,
+	"ShipmentManifestV2":                         true,
+	"InboundSchedule":                            true,
+	"ShipmentHandover":                           true,
+	"Tenant":                                     true,
+	"PackagingRecommendationDecisionTableDetail": true,
+	"OutboundPackingTask":                        true,
+	"PackagingRecommendationRuleSet":             true,
+	"InventoryWarehouseTransfer":                 true,
+	"OutboundStationManagement":                  true,
+	"RemoteConfig":                               true,
+	"ShipmentReceiving":                          true,
+	"OutboundCheckPack":                          true,
+	"InventoryCounting/__gql_mocks__":            true,
+	"InventoryMoveStock/V2/services":             true,
+	"InventoryAdmin":                             true,
+	"InboundV3Schedule":                          true,
+	"InventoryAdjustmentLog":                     true,
+	"InventoryReplenishmentTaskManagement":       true,
+	"InventoryWarehouseTransfer/components/InventoryWarehouseTransferDetail": true,
+	"AdminUser":                         true,
+	"OutboundPackerV2":                  true,
+	"OutboundStationManagementV2":       true,
+	"ShipmentLabeling":                  true,
+	"ShipmentManifestDestroy":           true,
+	"ShipmentTellMeWhyAllocationFailed": true,
+	"IntegrationVirtualBundlingV2":      true,
+	"InventoryGroupAdmin":               true,
+	"OutboundSchedulerConfig":           true,
+	"OutboundWaveConfig":                true,
+	"OutboundWavePickingTaskQueue":      true,
+	"WarehouseMap":                      true,
+	"IntegrationVirtualBundling":        true,
+	"InventoryCounting":                 true,
+	"InventoryMoveGroup":                true,
+	"Location":                          true,
+	"OutboundPacker":                    true,
+	"OutboundPesoDetail":                true,
+	"InboundInstruction":                true,
+	"Job":                               true,
+	"PackagingRecommenderVisualizer":    true,
+	"InventoryMoveStock":                true,
+	"OutboundWave":                      true,
+	"ShipmentGrouping":                  true,
+	"InventoryTaskManagement":           true,
+}
+
+var targetHooks map[string]bool = map[string]bool{
+	"useCreateUserV2":     true,
+	"useEditUserV2":       true,
+	"useCreateUserRoleV2": true,
+	"useEditUserRoleV2":   true,
+	"useRemoveUserRoleV2": true,
+}
+
+func GetGQLImport(parentFolderPath string) []string {
+	// Target hook functions to look for
+
+	// Store unique GQL imports
+	gqlImports := make(map[string]bool)
+
+	// Walk through the directory
+	filepath.Walk(parentFolderPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip if not a TypeScript file
+		if !strings.HasSuffix(info.Name(), ".ts") {
+			return nil
+		}
+
+		// Check if file name matches any of our target hooks
+		fileName := strings.TrimSuffix(info.Name(), ".ts")
+		if !targetHooks[fileName] {
+			return nil
+		}
+
+		// Read file content
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			// Look for import statements containing @wms/gqls
+			if strings.Contains(line, "import") && strings.Contains(line, "@wms/gqls") {
+				// Extract the import path
+				if start := strings.Index(line, "@wms/gqls"); start != -1 {
+					importPath := line[start:]
+					if end := strings.Index(importPath, "'"); end != -1 {
+						gqlImports[importPath[:end]] = true
+					} else if end := strings.Index(importPath, "\""); end != -1 {
+						gqlImports[importPath[:end]] = true
+					}
+				}
+			}
+		}
+
+		return scanner.Err()
+	})
+
+	// Convert map to slice
+	result := make([]string, 0, len(gqlImports))
+	for imp := range gqlImports {
+		result = append(result, imp)
+	}
+
+	return result
 }
