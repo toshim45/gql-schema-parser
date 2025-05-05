@@ -34,7 +34,7 @@ func TestGetEligiblePage(t *testing.T) {
 
 func TestGetGQLImport(t *testing.T) {
 	t.Log("---start---")
-	dirPath := "../gtl-wms-core-ui/packages/hooks/mutations"
+	dirPath := "../gtl-wms-core-ui/packages/hooks/mutations/user"
 	results := main.GetGQLImport(dirPath)
 	for _, imp := range results {
 		fmt.Printf("%s.ts\n", imp)

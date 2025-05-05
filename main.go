@@ -18,6 +18,7 @@ var (
 	opts struct {
 		SourceFile string `long:"source" description:"Input source file"`
 		SchemaFile string `long:"schema" description:"Input raw schema file"`
+		FieldGQL   string `long:"field" description:"Input field GQL string"`
 	}
 
 	scalarUnq map[string]bool = map[string]bool{}
@@ -34,30 +35,36 @@ func main() {
 			}
 		}
 		// For other errors, print the error message and exit with a non-zero status
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "⚠️ Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Println("schema file: ", opts.SchemaFile)
 	fmt.Println("source file: ", opts.SourceFile)
+	fmt.Println("field string: ", opts.FieldGQL)
 
-	gqlQuery := extractGQLFromFile(opts.SourceFile)
+	fmt.Printf("-------\n\n")
 
-	if gqlQuery == "" {
-		fmt.Fprintln(os.Stderr, "Error: no graphql query/mutation extracted")
-		os.Exit(1)
+	if opts.SourceFile != "" {
+		gqlQuery := extractGQLFromFile(opts.SourceFile)
+
+		if gqlQuery == "" {
+			fmt.Fprintln(os.Stderr, "⚠️ Error: no graphql query/mutation extracted")
+			os.Exit(1)
+		}
+
+		fetchByQuery(opts.SchemaFile, gqlQuery)
+	} else if opts.FieldGQL != "" {
+		fetchByField(opts.SchemaFile, opts.FieldGQL)
 	}
 
-	fmt.Printf("\n-----\n")
-
-	run(opts.SchemaFile, gqlQuery)
 }
 
 func extractGQLFromFile(filePath string) (output string) {
 	// Read the file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Println("Error reading file", filePath, ":", err)
+		fmt.Println("⚠️ Error reading file", filePath, ":", err)
 		os.Exit(1)
 	}
 
@@ -81,7 +88,7 @@ func extractGQLFromFile(filePath string) (output string) {
 	return
 }
 
-func run(schemaFilePath, gqlQuery string) {
+func fetchByQuery(schemaFilePath, gqlQuery string) {
 	// Load schema
 	schemaData, err := os.ReadFile(schemaFilePath)
 	if err != nil {
@@ -118,7 +125,7 @@ func run(schemaFilePath, gqlQuery string) {
 				} else if op.Operation == "mutation" {
 					processField(field, schema.Mutation, schema, visited, &output)
 				} else {
-					panic("gql operation type is not supported: " + op.Operation)
+					panic("⚠️ Error: gql operation type is not supported: " + op.Operation)
 				}
 			}
 		}
@@ -127,6 +134,60 @@ func run(schemaFilePath, gqlQuery string) {
 	for _, def := range output {
 		fmt.Println(def)
 		fmt.Println()
+	}
+}
+
+func fetchByField(schemaFilePath, gqlField string) {
+	// Load schema
+	schemaData, err := os.ReadFile(schemaFilePath)
+	if err != nil {
+		panic(err)
+	}
+	schema, err := gqlparser.LoadSchema(&ast.Source{Input: string(schemaData), Name: "schema.graphql"})
+	if err != nil {
+		panic(err)
+	}
+
+	fields := strings.Split(gqlField, " ")
+	if len(fields) != 2 {
+		fmt.Println("⚠️ Error: the format must be query/mutation field_name, example: mutation create_job")
+		return
+	}
+	opType := fields[0]
+	opName := fields[1]
+
+	var fieldDef *ast.FieldDefinition
+	if opType == "query" {
+		fieldDef = schema.Types[schema.Query.Name].Fields.ForName(opName)
+	} else if opType == "mutation" {
+		fieldDef = schema.Types[schema.Mutation.Name].Fields.ForName(opName)
+	} else {
+		panic("⚠️ Error: gql operation type is not supported: " + opType)
+	}
+
+	if fieldDef == nil {
+		return
+	}
+
+	visited := map[string]bool{}
+
+	// Print field info
+	fmt.Printf("Field Name: %s\n", fieldDef.Name)
+	fmt.Printf("Type: %s\n", fieldDef.Type.String())
+	fmt.Printf("Description: %s\n", fieldDef.Description)
+	fmt.Println("Arguments:")
+	for _, arg := range fieldDef.Arguments {
+		fmt.Printf("- %s: %s\n", arg.Name, arg.Type.String())
+		argBase := arg.Type.Name()
+		if isCustomType(argBase) {
+			printSchemaField(schema, argBase, visited)
+		}
+	}
+
+	fmt.Printf("\n-------\n\n")
+
+	if isCustomType(fieldDef.Type.Name()) {
+		printSchemaField(schema, fieldDef.Type.Name(), visited)
 	}
 }
 
@@ -237,6 +298,72 @@ func buildPartialType(def *ast.Definition, fields map[string]bool) string {
 	}
 	sb.WriteString("}")
 	return sb.String()
+}
+
+var builtInScalars = map[string]bool{
+	"Int":     true,
+	"Float":   true,
+	"String":  true,
+	"Boolean": true,
+	"ID":      true,
+}
+
+// isCustomType checks if a type is not a built-in scalar or introspection type
+func isCustomType(typeName string) bool {
+	return !builtInScalars[typeName] && !strings.HasPrefix(typeName, "__")
+}
+
+// printSchemaField prints a type definition and recursively prints nested types
+func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bool) {
+	if visited[typeName] {
+		return
+	}
+	visited[typeName] = true
+
+	typ := schema.Types[typeName]
+	if typ == nil {
+		fmt.Printf("⚠️ Error: Type %s not found in schema\n", typeName)
+		return
+	}
+
+	switch typ.Kind {
+	case ast.InputObject:
+		fmt.Printf("input %s {\n", typ.Name)
+		for _, f := range typ.Fields {
+			fmt.Printf("  %s: %s\n", f.Name, f.Type.String())
+		}
+		fmt.Println("}")
+		for _, f := range typ.Fields {
+			nestedType := f.Type.Name()
+			if isCustomType(nestedType) {
+				printSchemaField(schema, nestedType, visited)
+			}
+		}
+	case ast.Object:
+		fmt.Printf("type %s {\n", typ.Name)
+		for _, f := range typ.Fields {
+			fmt.Printf("  %s: %s\n", f.Name, f.Type.String())
+		}
+		fmt.Println("}")
+		for _, f := range typ.Fields {
+			nestedType := f.Type.Name()
+			if isCustomType(nestedType) {
+				printSchemaField(schema, nestedType, visited)
+			}
+		}
+	case ast.Enum:
+		fmt.Printf("enum %s: %v\n", typ.Name, typ.EnumValues)
+	case ast.Interface:
+		fmt.Printf("interface %s {\n", typ.Name)
+		for _, f := range typ.Fields {
+			fmt.Printf("  %s: %s\n", f.Name, f.Type.String())
+		}
+		fmt.Println("}")
+	case ast.Scalar:
+		fmt.Printf("scalar: %s\n", typ.Name)
+	default:
+		fmt.Printf("⚠️ Error: Unknown type kind %s for type %s\n", typ.Kind, typ.Name)
+	}
 }
 
 func typeAlreadyAdded(name string, output []string) bool {
