@@ -133,7 +133,6 @@ func fetchByQuery(schemaFilePath, gqlQuery string) {
 
 	for _, def := range output {
 		fmt.Println(def)
-		fmt.Println()
 	}
 }
 
@@ -170,6 +169,7 @@ func fetchByField(schemaFilePath, gqlField string) {
 	}
 
 	visited := map[string]bool{}
+	outputs := []string{}
 
 	// Print field info
 	fmt.Printf("Field Name: %s\n", fieldDef.Name)
@@ -180,14 +180,18 @@ func fetchByField(schemaFilePath, gqlField string) {
 		fmt.Printf("- %s: %s\n", arg.Name, arg.Type.String())
 		argBase := arg.Type.Name()
 		if isCustomType(argBase) {
-			printSchemaField(schema, argBase, visited)
+			printSchemaField(schema, argBase, visited, &outputs)
 		}
+	}
+
+	if isCustomType(fieldDef.Type.Name()) {
+		printSchemaField(schema, fieldDef.Type.Name(), visited, &outputs)
 	}
 
 	fmt.Printf("\n-------\n\n")
 
-	if isCustomType(fieldDef.Type.Name()) {
-		printSchemaField(schema, fieldDef.Type.Name(), visited)
+	for _, def := range outputs {
+		fmt.Println(def)
 	}
 }
 
@@ -314,7 +318,7 @@ func isCustomType(typeName string) bool {
 }
 
 // printSchemaField prints a type definition and recursively prints nested types
-func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bool) {
+func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bool, outputs *[]string) {
 	if visited[typeName] {
 		return
 	}
@@ -322,48 +326,50 @@ func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bo
 
 	typ := schema.Types[typeName]
 	if typ == nil {
-		fmt.Printf("⚠️ Error: Type %s not found in schema\n", typeName)
-		return
+		panic("⚠️ Error: Type " + typeName + " not found in schema\n")
 	}
 
+	var sb strings.Builder
 	switch typ.Kind {
 	case ast.InputObject:
-		fmt.Printf("input %s {\n", typ.Name)
+		sb.WriteString("input " + typ.Name + " {\n")
 		for _, f := range typ.Fields {
-			fmt.Printf("  %s: %s\n", f.Name, f.Type.String())
+			sb.WriteString("  " + f.Name + ": " + f.Type.String() + "\n")
 		}
-		fmt.Println("}")
+		sb.WriteString("}")
 		for _, f := range typ.Fields {
 			nestedType := f.Type.Name()
 			if isCustomType(nestedType) {
-				printSchemaField(schema, nestedType, visited)
+				printSchemaField(schema, nestedType, visited, outputs)
 			}
 		}
 	case ast.Object:
-		fmt.Printf("type %s {\n", typ.Name)
+		sb.WriteString("type " + typ.Name + " {\n")
 		for _, f := range typ.Fields {
-			fmt.Printf("  %s: %s\n", f.Name, f.Type.String())
+			sb.WriteString("  " + f.Name + ": " + f.Type.String() + "\n")
 		}
-		fmt.Println("}")
+		sb.WriteString("}")
 		for _, f := range typ.Fields {
 			nestedType := f.Type.Name()
 			if isCustomType(nestedType) {
-				printSchemaField(schema, nestedType, visited)
+				printSchemaField(schema, nestedType, visited, outputs)
 			}
 		}
 	case ast.Enum:
-		fmt.Printf("enum %s: %v\n", typ.Name, typ.EnumValues)
+		sb.WriteString(fmt.Sprintf("enum %s: %v\n", typ.Name, typ.EnumValues))
 	case ast.Interface:
-		fmt.Printf("interface %s {\n", typ.Name)
+		sb.WriteString("interface " + typ.Name + " {\n")
 		for _, f := range typ.Fields {
 			fmt.Printf("  %s: %s\n", f.Name, f.Type.String())
 		}
-		fmt.Println("}")
+		sb.WriteString("}")
 	case ast.Scalar:
-		fmt.Printf("scalar: %s\n", typ.Name)
+		sb.WriteString("scalar: " + typ.Name + "\n")
 	default:
-		fmt.Printf("⚠️ Error: Unknown type kind %s for type %s\n", typ.Kind, typ.Name)
+		panic("⚠️ Error: Unknown type kind " + string(typ.Kind) + " for type " + typ.Name + "\n")
 	}
+
+	*outputs = append(*outputs, sb.String())
 }
 
 func typeAlreadyAdded(name string, output []string) bool {
