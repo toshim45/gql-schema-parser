@@ -9,7 +9,7 @@ build: clean
 	
 dev-start:
 	@echo "\n---running---\n"
-	@if [ -f gqlsch ]; then ./gqlsch; else echo "invalid binary"; fi
+	@if [ -f gqlsch ]; then ./gqlsch --help; else echo "invalid binary"; fi
 
 install: build
 	@echo "---installing---"
