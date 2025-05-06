@@ -16,10 +16,11 @@ import (
 
 var (
 	opts struct {
-		SourceFile string `long:"source" description:"Input source file"`
 		SchemaFile string `long:"schema" description:"Input raw schema file"`
+		SourceFile string `long:"source" description:"Input source file which countain graphql (.js,.ts)"`
 		FieldGQL   string `long:"field" description:"Input field GQL string"`
 		TypeGQL    string `long:"type" description:"Input type GQL string"`
+		Depth      uint   `short:"d" long:"depth" description:"Type recursion depth, default 5" default:"5"`
 	}
 
 	scalarUnq map[string]bool = map[string]bool{}
@@ -44,6 +45,7 @@ func main() {
 	fmt.Println("source file: ", opts.SourceFile)
 	fmt.Println("field string: ", opts.FieldGQL)
 	fmt.Println("type string: ", opts.TypeGQL)
+	fmt.Println("depth uint: ", opts.Depth)
 
 	fmt.Printf("-------\n\n")
 
@@ -57,9 +59,9 @@ func main() {
 
 		fetchByQuery(opts.SchemaFile, gqlQuery)
 	} else if opts.FieldGQL != "" {
-		fetchByField(opts.SchemaFile, opts.FieldGQL)
+		fetchByField(opts.SchemaFile, opts.FieldGQL, &opts.Depth)
 	} else if opts.TypeGQL != "" {
-		fetchByType(opts.SchemaFile, opts.TypeGQL)
+		fetchByType(opts.SchemaFile, opts.TypeGQL, &opts.Depth)
 	}
 }
 
@@ -145,20 +147,20 @@ func fetchByQuery(schemaFilePath, gqlQuery string) {
 	}
 }
 
-func fetchByType(schemaFilePath, gqlType string) {
+func fetchByType(schemaFilePath, gqlType string, depth *uint) {
 	// Load schema
 	schema := LoadSchema(schemaFilePath)
 	visited := map[string]bool{}
 	outputs := []string{}
 
-	printSchemaField(schema, gqlType, visited, &outputs)
+	printSchemaField(schema, gqlType, visited, &outputs, depth)
 
 	for _, output := range outputs {
 		fmt.Println(output)
 	}
 }
 
-func fetchByField(schemaFilePath, gqlField string) {
+func fetchByField(schemaFilePath, gqlField string, depth *uint) {
 	// Load schema
 	schema := LoadSchema(schemaFilePath)
 
@@ -195,12 +197,12 @@ func fetchByField(schemaFilePath, gqlField string) {
 		fmt.Printf("- %s: %s\n", arg.Name, arg.Type.String())
 		argBase := arg.Type.Name()
 		if isCustomType(argBase) {
-			printSchemaField(schema, argBase, visited, &outputs)
+			printSchemaField(schema, argBase, visited, &outputs, depth)
 		}
 	}
 
 	if isCustomType(fieldDef.Type.Name()) {
-		printSchemaField(schema, fieldDef.Type.Name(), visited, &outputs)
+		printSchemaField(schema, fieldDef.Type.Name(), visited, &outputs, depth)
 	}
 
 	fmt.Printf("\n-------\n\n")
@@ -333,7 +335,12 @@ func isCustomType(typeName string) bool {
 }
 
 // printSchemaField prints a type definition and recursively prints nested types
-func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bool, outputs *[]string) {
+func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bool, outputs *[]string, depth *uint) {
+	if *depth > 0 {
+		*depth--
+	} else {
+		return
+	}
 	if visited[typeName] {
 		return
 	}
@@ -355,7 +362,7 @@ func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bo
 		for _, f := range typ.Fields {
 			nestedType := f.Type.Name()
 			if isCustomType(nestedType) {
-				printSchemaField(schema, nestedType, visited, outputs)
+				printSchemaField(schema, nestedType, visited, outputs, depth)
 			}
 		}
 	case ast.Object:
@@ -367,7 +374,7 @@ func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bo
 		for _, f := range typ.Fields {
 			nestedType := f.Type.Name()
 			if isCustomType(nestedType) {
-				printSchemaField(schema, nestedType, visited, outputs)
+				printSchemaField(schema, nestedType, visited, outputs, depth)
 			}
 		}
 	case ast.Enum:
