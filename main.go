@@ -19,6 +19,7 @@ var (
 		SourceFile string `long:"source" description:"Input source file"`
 		SchemaFile string `long:"schema" description:"Input raw schema file"`
 		FieldGQL   string `long:"field" description:"Input field GQL string"`
+		TypeGQL    string `long:"type" description:"Input type GQL string"`
 	}
 
 	scalarUnq map[string]bool = map[string]bool{}
@@ -42,6 +43,7 @@ func main() {
 	fmt.Println("schema file: ", opts.SchemaFile)
 	fmt.Println("source file: ", opts.SourceFile)
 	fmt.Println("field string: ", opts.FieldGQL)
+	fmt.Println("type string: ", opts.TypeGQL)
 
 	fmt.Printf("-------\n\n")
 
@@ -56,8 +58,22 @@ func main() {
 		fetchByQuery(opts.SchemaFile, gqlQuery)
 	} else if opts.FieldGQL != "" {
 		fetchByField(opts.SchemaFile, opts.FieldGQL)
+	} else if opts.TypeGQL != "" {
+		fetchByType(opts.SchemaFile, opts.TypeGQL)
+	}
+}
+
+func LoadSchema(schemaFilePath string) *ast.Schema {
+	schemaData, err := os.ReadFile(schemaFilePath)
+	if err != nil {
+		panic("schema read file: " + err.Error())
+	}
+	schema, err := gqlparser.LoadSchema(&ast.Source{Input: string(schemaData), Name: "schema.graphql"})
+	if err != nil {
+		panic("schema load: " + err.Error())
 	}
 
+	return schema
 }
 
 func extractGQLFromFile(filePath string) (output string) {
@@ -90,14 +106,7 @@ func extractGQLFromFile(filePath string) (output string) {
 
 func fetchByQuery(schemaFilePath, gqlQuery string) {
 	// Load schema
-	schemaData, err := os.ReadFile(schemaFilePath)
-	if err != nil {
-		panic(err)
-	}
-	schema, err := gqlparser.LoadSchema(&ast.Source{Input: string(schemaData), Name: "schema.graphql"})
-	if err != nil {
-		panic(err)
-	}
+	schema := LoadSchema(schemaFilePath)
 
 	// Load query
 
@@ -131,21 +140,27 @@ func fetchByQuery(schemaFilePath, gqlQuery string) {
 		}
 	}
 
-	for _, def := range output {
-		fmt.Println(def)
+	for _, o := range output {
+		fmt.Println(o)
+	}
+}
+
+func fetchByType(schemaFilePath, gqlType string) {
+	// Load schema
+	schema := LoadSchema(schemaFilePath)
+	visited := map[string]bool{}
+	outputs := []string{}
+
+	printSchemaField(schema, gqlType, visited, &outputs)
+
+	for _, output := range outputs {
+		fmt.Println(output)
 	}
 }
 
 func fetchByField(schemaFilePath, gqlField string) {
 	// Load schema
-	schemaData, err := os.ReadFile(schemaFilePath)
-	if err != nil {
-		panic(err)
-	}
-	schema, err := gqlparser.LoadSchema(&ast.Source{Input: string(schemaData), Name: "schema.graphql"})
-	if err != nil {
-		panic(err)
-	}
+	schema := LoadSchema(schemaFilePath)
 
 	fields := strings.Split(gqlField, " ")
 	if len(fields) != 2 {

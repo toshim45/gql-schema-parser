@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/toshim45/gqlsch"
@@ -18,7 +19,7 @@ func TestMerge(t *testing.T) {
 
 func TestGetImportFromDir(t *testing.T) {
 	t.Log("---start---")
-	dirPath := PREFIX_PATH + "/wms-ui-v2/src/ui/pages"
+	dirPath := getPrefixPath() + "/wms-ui-v2/src/ui/pages"
 	results := main.GetImportFromDir(dirPath)
 	if len(results) == 0 {
 		t.Error("no result from: " + dirPath)
@@ -31,7 +32,7 @@ func TestGetImportFromDir(t *testing.T) {
 
 func TestGetEligiblePage(t *testing.T) {
 	t.Log("---start---")
-	dirPath := PREFIX_PATH + "/wms-ui-v2/src/ui/pages"
+	dirPath := getPrefixPath() + "/wms-ui-v2/src/ui/pages"
 	results := main.GetEligiblePage(dirPath)
 	for dp := range results {
 		fmt.Printf("Directory Path: %s\n", dp)
@@ -44,7 +45,7 @@ func TestGetEligiblePage(t *testing.T) {
 
 func TestGetGQLImport(t *testing.T) {
 	t.Log("---start---")
-	dirPath := PREFIX_PATH + "/packages/hooks/mutations/warehouse"
+	dirPath := getPrefixPath() + "/packages/hooks/mutations/warehouse"
 	results := main.GetGQLImport(dirPath)
 	for _, imp := range results {
 		fmt.Printf("%s.ts\n", imp)
@@ -53,4 +54,23 @@ func TestGetGQLImport(t *testing.T) {
 		t.Error("no result from: " + dirPath)
 	}
 	t.Log("---done---")
+}
+
+func TestParser(t *testing.T) {
+	t.Log("---start---")
+	schemaFilePath := "mini.graphql"
+	schemaType := "InboundV3Input"
+	schema := main.LoadSchema(schemaFilePath)
+	def := schema.Types[schemaType]
+	t.Log("def: ", def.Name, def.Kind)
+	t.Log("---done---")
+}
+
+func getPrefixPath() string {
+	envPrefixPath := os.Getenv("PREFIX_PATH")
+	if envPrefixPath == "" {
+		return PREFIX_PATH
+	}
+
+	return envPrefixPath
 }

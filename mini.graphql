@@ -1,0 +1,33 @@
+schema {
+  query: query_root
+}
+
+type InboundV3InboundParameter {
+  key: String!
+  value: String!
+}
+
+input InboundV3InboundParameterInput {
+  key: String!
+  value: String!
+}
+
+type InboundV3Type {
+  id: Int!
+  name: String!
+}
+
+type InboundV3Inbound {
+  id: Int
+  inb_type: InboundV3Type
+  parameters: [InboundV3InboundParameter]
+}
+
+input InboundV3Input {
+  inb_type: String!
+  parameters: [InboundV3InboundParameterInput]
+}
+
+type query_root {
+  create_inboundv3_inbound(in: InboundV3Input): InboundV3Inbound
+}
