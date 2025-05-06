@@ -28,6 +28,15 @@ input InboundV3Input {
   parameters: [InboundV3InboundParameterInput]
 }
 
+type IgnoredInboundV3Type {
+  id: Int!
+}
+
+type IgnoredInboundV3InboundParameter {
+  key: String!
+}
+
+
 type query_root {
   create_inboundv3_inbound(in: InboundV3Input): InboundV3Inbound
 }

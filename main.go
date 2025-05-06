@@ -16,14 +16,16 @@ import (
 
 var (
 	opts struct {
-		SchemaFile string `long:"schema" description:"Input raw schema file"`
-		SourceFile string `long:"source" description:"Input source file which countain graphql (.js,.ts)"`
-		FieldGQL   string `long:"field" description:"Input field GQL string"`
-		TypeGQL    string `long:"type" description:"Input type GQL string"`
-		Depth      uint   `short:"d" long:"depth" description:"Type recursion depth, default 5" default:"5"`
+		SchemaFile  string `long:"schema" description:"Input raw schema file"`
+		SourceFile  string `long:"source" description:"Input source file which countain graphql (.js,.ts)"`
+		FieldGQL    string `long:"field" description:"Input field GQL string"`
+		TypeGQL     string `long:"type" description:"Input type GQL string"`
+		Depth       uint   `short:"d" long:"depth" description:"Type recursion depth, default 5" default:"5"`
+		IgnoredFile string `short:"i" long:"ignored" description:"Type ignored file path"`
 	}
 
-	scalarUnq map[string]bool = map[string]bool{}
+	scalarUnq    map[string]bool = map[string]bool{}
+	ignoredTypes map[string]bool = map[string]bool{}
 )
 
 func main() {
@@ -46,8 +48,13 @@ func main() {
 	fmt.Println("field string: ", opts.FieldGQL)
 	fmt.Println("type string: ", opts.TypeGQL)
 	fmt.Println("depth uint: ", opts.Depth)
+	fmt.Println("ignored file: ", opts.IgnoredFile)
 
 	fmt.Printf("-------\n\n")
+
+	if opts.IgnoredFile != "" {
+		parseIgnoredFile(opts.IgnoredFile)
+	}
 
 	if opts.SourceFile != "" {
 		gqlQuery := extractGQLFromFile(opts.SourceFile)
@@ -63,6 +70,25 @@ func main() {
 	} else if opts.TypeGQL != "" {
 		fetchByType(opts.SchemaFile, opts.TypeGQL, &opts.Depth)
 	}
+}
+
+func parseIgnoredFile(filePath string) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		panic("⚠️ Error reading ignored file" + filePath + ":" + err.Error())
+	}
+
+	lines := strings.Split(string(content), "\n")
+	total := 0
+	for i, line := range lines {
+		ignoredTypes[line] = true
+		total = i
+	}
+
+	total++
+
+	fmt.Println("ignored:", total, "types")
+	fmt.Printf("-------\n\n")
 }
 
 func LoadSchema(schemaFilePath string) *ast.Schema {
@@ -82,8 +108,7 @@ func extractGQLFromFile(filePath string) (output string) {
 	// Read the file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Println("⚠️ Error reading file", filePath, ":", err)
-		os.Exit(1)
+		panic("⚠️ Error reading gql file" + filePath + ":" + err.Error())
 	}
 
 	// Convert the content to a string
@@ -336,6 +361,10 @@ func isCustomType(typeName string) bool {
 
 // printSchemaField prints a type definition and recursively prints nested types
 func printSchemaField(schema *ast.Schema, typeName string, visited map[string]bool, outputs *[]string, depth *uint) {
+	if _, exist := ignoredTypes[typeName]; exist {
+		return
+	}
+
 	if *depth > 0 {
 		*depth--
 	} else {
