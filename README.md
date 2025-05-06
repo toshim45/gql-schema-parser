@@ -1,6 +1,8 @@
 # Walkthrough
 ```
 gqlsch --schema big-raw-gql-schema.graphql --source <file containing graphql, can be .ts .js>
+gqlsch --schema big-raw-gql-schema.graphql --field "mutation create_outbound_work"
+gqlsch --schema big-raw-gql-schema.graphql --type outbound_work
 ```
 
 ## Manual Proses
