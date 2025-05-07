@@ -2,7 +2,7 @@
 ```
 gqlsch --schema big-raw-gql-schema.graphql --source <file containing graphql, can be .ts .js>
 gqlsch --schema big-raw-gql-schema.graphql --field "mutation create_outbound_work"
-gqlsch --schema big-raw-gql-schema.graphql --type outbound_work -d 3
+gqlsch --schema big-raw-gql-schema.graphql --type outbound_work -d 3 -i ignored.txt
 
 gqlsch --help
 ```
@@ -27,7 +27,9 @@ gqlsch --help
 ## Feature Goals
 - [x] take graphql query from ts
 - [x] integrate cli to those
-- [ ] test parse mutation
+- [x] test parse mutation
+- [x] ignored type via files separated by line
+- [x] depth parameter 
 - [ ] source directory or files
 - [ ] merge multiple graphql query
 - [ ] compare the diff from target graphql if any
