@@ -5,11 +5,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/toshim45/gqlsch"
+	main "github.com/toshim45/gqlsch"
 )
 
 const (
-	PREFIX_PATH = "/Users/admin/Documents/gtlsource/gtl-wms-core-ui"
+	PREFIX_PATH = "/Users/bytedance/Documents/Sources/gtl-core-ui"
 )
 
 func TestMerge(t *testing.T) {
@@ -45,7 +45,7 @@ func TestGetEligiblePage(t *testing.T) {
 
 func TestGetGQLImport(t *testing.T) {
 	t.Log("---start---")
-	dirPath := getPrefixPath() + "/packages/hooks/mutations/warehouse"
+	dirPath := getPrefixPath() + "/packages/hooks/mutations/" + getSuffixPath()
 	results := main.GetGQLImport(dirPath)
 	for _, imp := range results {
 		fmt.Printf("%s.ts\n", imp)
@@ -54,6 +54,11 @@ func TestGetGQLImport(t *testing.T) {
 		t.Error("no result from: " + dirPath)
 	}
 	t.Log("---done---")
+}
+
+func getSuffixPath() string {
+	//TODO: this function only required for TestGetGQLImport
+	panic("unimplemented")
 }
 
 func TestParser(t *testing.T) {

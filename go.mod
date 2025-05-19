@@ -1,6 +1,6 @@
 module github.com/toshim45/gqlsch
 
-go 1.22.1
+go 1.22.8
 
 require github.com/vektah/gqlparser/v2 v2.5.25
 
